@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRANSNETX — Transport Management System</title>
+    <meta name="description" content="TRANSNETX — A next-generation transport management platform for drivers, passengers, and administrators.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black:    #040507;
+            --deep:     #080c14;
+            --navy:     #0a1628;
+            --accent:   #e8b84b;
+            --accent2:  #f0c060;
+            --electric: #4db8ff;
+            --red:      #ff3c3c;
+            --white:    #f4f2ec;
+            --muted:    #8a8f9e;
+            --glass:    rgba(255,255,255,0.04);
+            --glass-border: rgba(255,255,255,0.08);
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--black);
+            color: var(--white);
+        }
+
+        /* ── CANVAS BACKGROUND ── */
+        #road-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+        }
+
+        /* ── NOISE OVERLAY ── */
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.035;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            background-size: 200px 200px;
+        }
+
+        /* ── SCANLINES ── */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.08) 2px,
+                rgba(0,0,0,0.08) 4px
+            );
+        }
+
+        /* ── VIGNETTE ── */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 3;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center,
+                transparent 30%,
+                rgba(4,5,7,0.6) 70%,
+                rgba(4,5,7,0.92) 100%
+            );
+        }
+
+        /* ── CORNER DECORATIONS ── */
+        .corner-deco {
+            position: fixed;
+            z-index: 5;
+            opacity: 0.18;
+            pointer-events: none;
+        }
+        .corner-deco.tl { top: 0; left: 0; }
+        .corner-deco.tr { top: 0; right: 0; transform: rotate(90deg); }
+        .corner-deco.bl { bottom: 36px; left: 0; transform: rotate(270deg); }
+        .corner-deco.br { bottom: 36px; right: 0; transform: rotate(180deg); }
+
+        /* ── LIVE BADGE ── */
+        .live-badge {
+            position: fixed;
+            top: 24px; right: 24px;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(255,60,60,0.15);
+            border: 1px solid rgba(255,60,60,0.3);
+            border-radius: 6px;
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--red);
+            opacity: 0;
+            animation: fadeIn 0.8s 2s forwards;
+        }
+        .live-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--red);
+            animation: pulseDot 1.5s ease-in-out infinite;
+        }
+
+        /* ── MOVING VEHICLE ── */
+        .vehicle-track {
+            position: fixed;
+            bottom: 60px;
+            left: -200px;
+            z-index: 8;
+            animation: driveAcross 14s linear infinite;
+            animation-delay: 1s;
+        }
+        .vehicle-track svg {
+            width: 120px;
+            filter: drop-shadow(0 0 10px rgba(232,184,75,0.4));
+        }
+
+        /* ── TICKER BAR ── */
+        .ticker-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 50;
+            height: 36px;
+            background: rgba(232,184,75,0.95);
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            border-top: 1px solid rgba(0,0,0,0.2);
+        }
+        .ticker-label {
+            padding: 0 20px;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 14px;
+            letter-spacing: 3px;
+            background: var(--black);
+            color: var(--accent);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            border-right: 1px solid rgba(232,184,75,0.3);
+        }
+        .ticker-track {
+            display: flex;
+            animation: ticker 30s linear infinite;
+            white-space: nowrap;
+        }
+        .ticker-item {
+            padding: 0 48px;
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--black);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .ticker-dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: var(--black);
+            opacity: 0.4;
+        }
+
+        /* ── MAIN CONTENT ── */
+        .splash-wrapper {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px 80px;
+            text-align: center;
+        }
+
+        /* ── LOGO BADGE ── */
+        .logo-ring {
+            position: relative;
+            width: 110px;
+            height: 110px;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: scaleIn 0.9s cubic-bezier(0.16,1,0.3,1) 0.3s forwards;
+        }
+
+        .logo-ring svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .logo-ring .orbit {
+            position: absolute;
+            inset: -18px;
+            border-radius: 50%;
+            border: 1px solid rgba(232,184,75,0.2);
+            animation: spinOrbit 8s linear infinite;
+        }
+
+        .logo-ring .orbit::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px; height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent), 0 0 20px rgba(232,184,75,0.4);
+        }
+
+        .logo-ring .orbit-2 {
+            position: absolute;
+            inset: -34px;
+            border-radius: 50%;
+            border: 1px solid rgba(232,184,75,0.08);
+            animation: spinOrbit 14s linear infinite reverse;
+        }
+
+        .logo-ring .orbit-2::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px; height: 4px;
+            background: var(--electric);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--electric);
+        }
+
+        /* ── SYSTEM LABEL ── */
+        .sys-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 6px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 18px;
+            opacity: 0;
+            animation: fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 0.6s forwards;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+        }
+        .sys-label::before,
+        .sys-label::after {
+            content: '';
+            width: 28px;
+            height: 1px;
+            background: var(--accent);
+            opacity: 0.6;
+        }
+
+        /* ── HEADLINE ── */
+        .splash-headline {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(72px, 10vw, 140px);
+            line-height: 0.88;
+            letter-spacing: 4px;
+            color: var(--white);
+            opacity: 0;
+            animation: fadeUp 0.9s cubic-bezier(0.16,1,0.3,1) 0.75s forwards;
+            margin-bottom: 6px;
+        }
+        .splash-headline em {
+            font-style: normal;
+            color: var(--accent);
+            position: relative;
+        }
+        .splash-headline em::after {
+            content: '';
+            position: absolute;
+            bottom: 4px; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(to right, var(--accent), transparent);
+        }
+
+        /* ── TAGLINE ── */
+        .splash-tagline {
+            font-size: 15px;
+            font-weight: 300;
+            color: var(--muted);
+            letter-spacing: 1px;
+            margin-bottom: 54px;
+            max-width: 480px;
+            line-height: 1.7;
+            opacity: 0;
+            animation: fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 0.95s forwards;
+        }
+
+        /* ── STATS STRIP ── */
+        .stats-strip {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 56px;
+            opacity: 0;
+            animation: fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 1.1s forwards;
+        }
+        .stat-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 36px;
+            gap: 4px;
+        }
+        .stat-block + .stat-block {
+            border-left: 1px solid var(--glass-border);
+        }
+        .stat-num {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 38px;
+            letter-spacing: 2px;
+            color: var(--white);
+            line-height: 1;
+        }
+        .stat-num span {
+            color: var(--accent);
+        }
+        .stat-label {
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* ── ENTER BUTTON ── */
+        .btn-enter-wrap {
+            opacity: 0;
+            animation: fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) 1.25s forwards;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-enter {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 20px 54px;
+            background: var(--accent);
+            border: none;
+            border-radius: 6px;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 22px;
+            letter-spacing: 6px;
+            color: var(--black);
+            cursor: pointer;
+            overflow: hidden;
+            text-decoration: none;
+            transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+            box-shadow: 0 4px 24px rgba(232,184,75,0.25);
+        }
+
+        .btn-enter i {
+            font-size: 18px;
+            transition: transform 0.3s ease;
+        }
+
+        .btn-enter::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn-enter::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%,-50%);
+            transition: width 0.6s, height 0.6s, opacity 0.6s;
+            opacity: 0;
+        }
+
+        .btn-enter:hover {
+            background: var(--accent2);
+            box-shadow: 0 8px 40px rgba(232,184,75,0.5), 0 0 0 1px rgba(232,184,75,0.3);
+            transform: translateY(-3px);
+        }
+
+        .btn-enter:hover::before {
+            opacity: 1;
+        }
+
+        .btn-enter:hover i {
+            transform: translateX(4px);
+        }
+
+        .btn-enter:active::after {
+            width: 400px; height: 400px;
+            opacity: 0;
+            transition: 0s;
+        }
+
+        /* Pulse ring around button */
+        .btn-pulse-ring {
+            position: absolute;
+            inset: -6px;
+            border-radius: 10px;
+            border: 1px solid rgba(232,184,75,0.3);
+            animation: pulseRing 2.5s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .btn-enter-note {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--muted);
+            text-transform: uppercase;
+            opacity: 0.6;
+        }
+
+        /* ── SCROLL LINE (left side deco) ── */
+        .side-deco {
+            position: fixed;
+            left: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            animation: fadeIn 0.8s 1.8s forwards;
+        }
+        .side-deco-line {
+            width: 1px;
+            height: 80px;
+            background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+            animation: breatheLine 3s ease-in-out infinite;
+        }
+        .side-deco-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            border: 1px solid var(--accent);
+            opacity: 0.6;
+        }
+        .side-deco-text {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 4px;
+            color: var(--muted);
+            writing-mode: vertical-rl;
+            text-transform: uppercase;
+        }
+
+        /* ── VERSION TAG ── */
+        .version-tag {
+            position: fixed;
+            left: 24px;
+            bottom: 56px;
+            z-index: 20;
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: var(--muted);
+            opacity: 0;
+            animation: fadeIn 0.8s 2s forwards;
+        }
+
+        /* ── LOADING SCREEN OVERLAY ── */
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: var(--black);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            transition: opacity 0.6s ease, visibility 0.6s;
+        }
+        #loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader-brand {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 48px;
+            letter-spacing: 10px;
+            color: var(--white);
+            animation: flicker 1.2s ease-in-out 2;
+        }
+        .loader-brand span { color: var(--accent); }
+
+        .loader-bar-wrap {
+            width: 240px;
+            height: 2px;
+            background: var(--glass-border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .loader-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--accent), var(--electric));
+            width: 0%;
+            border-radius: 2px;
+            animation: loadProgress 1.8s cubic-bezier(0.4,0,0.2,1) forwards;
+        }
+        .loader-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 4px;
+            color: var(--muted);
+            text-transform: uppercase;
+            animation: typingDots 1.8s steps(3,end) infinite;
+        }
+
+        /* ── TRANSITION OVERLAY (on enter) ── */
+        #transition-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 300;
+            background: var(--accent);
+            transform: scaleY(0);
+            transform-origin: bottom;
+            pointer-events: none;
+        }
+        #transition-overlay.active {
+            animation: wipeIn 0.7s cubic-bezier(0.76,0,0.24,1) forwards;
+        }
+
+        /* ── KEYFRAMES ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.7); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes spinOrbit {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes pulseRing {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50%       { transform: scale(1.05); opacity: 0.7; }
+        }
+        @keyframes breatheLine {
+            0%, 100% { opacity: 0.3; transform: scaleY(1); }
+            50%       { opacity: 1;   transform: scaleY(0.7); }
+        }
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.4; transform: scale(1.5); }
+        }
+        @keyframes ticker {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-50%); }
+        }
+        @keyframes driveAcross {
+            from { left: -200px; }
+            to   { left: calc(100vw + 200px); }
+        }
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            25%       { opacity: 0.4; }
+            50%       { opacity: 1; }
+            75%       { opacity: 0.6; }
+        }
+        @keyframes loadProgress {
+            0%   { width: 0%; }
+            20%  { width: 15%; }
+            50%  { width: 55%; }
+            80%  { width: 82%; }
+            100% { width: 100%; }
+        }
+        @keyframes typingDots {
+            0%   { content: 'INITIALIZING'; }
+            33%  { content: 'INITIALIZING.'; }
+            66%  { content: 'INITIALIZING..'; }
+            100% { content: 'INITIALIZING...'; }
+        }
+        @keyframes wipeIn {
+            from { transform: scaleY(0); }
+            to   { transform: scaleY(1); }
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 768px) {
+            .splash-headline {
+                font-size: clamp(56px, 15vw, 100px);
+            }
+            .stats-strip {
+                gap: 0;
+            }
+            .stat-block {
+                padding: 0 20px;
+            }
+            .stat-num {
+                font-size: 28px;
+            }
+            .side-deco {
+                display: none;
+            }
+        }
+        @media (max-width: 480px) {
+            .stats-strip {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 16px;
+            }
+            .stat-block + .stat-block {
+                border-left: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── LOADING SCREEN ── -->
+<div id="loading-screen">
+    <div class="loader-brand">TRANSNET<span>X</span></div>
+    <div class="loader-bar-wrap">
+        <div class="loader-bar"></div>
+    </div>
+    <div class="loader-label">INITIALIZING SYSTEM</div>
+</div>
+
+<!-- ── TRANSITION OVERLAY ── -->
+<div id="transition-overlay"></div>
+
+<!-- ── CANVAS BACKGROUND ── -->
+<canvas id="road-canvas"></canvas>
+
+<!-- ── OVERLAYS ── -->
+<div class="noise"></div>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- ── CORNER DECO ── -->
+<svg class="corner-deco tl" width="120" height="120" viewBox="0 0 120 120">
+    <path d="M0,120 L0,0 L120,0" fill="none" stroke="#e8b84b" stroke-width="1"/>
+    <circle cx="0" cy="0" r="6" fill="#e8b84b"/>
+    <path d="M20,120 L20,20 L120,20" fill="none" stroke="#e8b84b" stroke-width="0.5" opacity="0.4"/>
+</svg>
+<svg class="corner-deco tr" width="120" height="120" viewBox="0 0 120 120">
+    <path d="M0,120 L0,0 L120,0" fill="none" stroke="#e8b84b" stroke-width="1"/>
+    <circle cx="0" cy="0" r="6" fill="#e8b84b"/>
+    <path d="M20,120 L20,20 L120,20" fill="none" stroke="#e8b84b" stroke-width="0.5" opacity="0.4"/>
+</svg>
+<svg class="corner-deco bl" width="120" height="120" viewBox="0 0 120 120">
+    <path d="M0,120 L0,0 L120,0" fill="none" stroke="#e8b84b" stroke-width="1"/>
+    <circle cx="0" cy="0" r="6" fill="#e8b84b"/>
+    <path d="M20,120 L20,20 L120,20" fill="none" stroke="#e8b84b" stroke-width="0.5" opacity="0.4"/>
+</svg>
+<svg class="corner-deco br" width="120" height="120" viewBox="0 0 120 120">
+    <path d="M0,120 L0,0 L120,0" fill="none" stroke="#e8b84b" stroke-width="1"/>
+    <circle cx="0" cy="0" r="6" fill="#e8b84b"/>
+    <path d="M20,120 L20,20 L120,20" fill="none" stroke="#e8b84b" stroke-width="0.5" opacity="0.4"/>
+</svg>
+
+<!-- ── LIVE BADGE ── -->
+<div class="live-badge">
+    <div class="live-dot"></div>
+    LIVE DISPATCH
+</div>
+
+<!-- ── MOVING VEHICLE ── -->
+<div class="vehicle-track">
+    <svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="8" width="110" height="26" rx="4" fill="#0a1628" stroke="#e8b84b" stroke-width="1.5"/>
+        <rect x="10" y="12" width="14" height="10" rx="2" fill="#4db8ff" opacity="0.6"/>
+        <rect x="30" y="12" width="14" height="10" rx="2" fill="#4db8ff" opacity="0.6"/>
+        <rect x="50" y="12" width="14" height="10" rx="2" fill="#4db8ff" opacity="0.6"/>
+        <rect x="70" y="12" width="14" height="10" rx="2" fill="#4db8ff" opacity="0.6"/>
+        <rect x="90" y="12" width="16" height="10" rx="2" fill="#e8b84b" opacity="0.8"/>
+        <circle cx="22" cy="34" r="6" fill="#1a1a2e" stroke="#e8b84b" stroke-width="1.5"/>
+        <circle cx="22" cy="34" r="2.5" fill="#e8b84b"/>
+        <circle cx="90" cy="34" r="6" fill="#1a1a2e" stroke="#e8b84b" stroke-width="1.5"/>
+        <circle cx="90" cy="34" r="2.5" fill="#e8b84b"/>
+        <rect x="108" y="14" width="6" height="4" rx="1" fill="#fff" opacity="0.9"/>
+        <text x="40" y="26" font-family="sans-serif" font-size="7" fill="#e8b84b" letter-spacing="3" font-weight="bold">TRANSNET X</text>
+    </svg>
+</div>
+
+<!-- ── TICKER BAR ── -->
+<div class="ticker-bar">
+    <div class="ticker-label">LIVE</div>
+    <div class="ticker-track" id="ticker-track"></div>
+</div>
+
+<!-- ── SIDE DECO ── -->
+<div class="side-deco">
+    <div class="side-deco-line"></div>
+    <div class="side-deco-dot"></div>
+    <div class="side-deco-text">Transport System</div>
+    <div class="side-deco-dot"></div>
+    <div class="side-deco-line"></div>
+</div>
+
+<!-- ── VERSION TAG ── -->
+<div class="version-tag">SYS v2.0.1 // 2024</div>
+
+<!-- ── MAIN SPLASH CONTENT ── -->
+<div class="splash-wrapper">
+
+    <!-- LOGO RING -->
+    <div class="logo-ring">
+        <div class="orbit"></div>
+        <div class="orbit-2"></div>
+        <svg viewBox="0 0 110 110" fill="none">
+            <polygon points="55,5 102,30 102,80 55,105 8,80 8,30" fill="none" stroke="#e8b84b" stroke-width="1.5"/>
+            <polygon points="55,18 89,37 89,73 55,92 21,73 21,37" fill="none" stroke="#e8b84b" stroke-width="0.5" opacity="0.35"/>
+            <polygon points="55,30 78,44 78,66 55,80 32,66 32,44" fill="none" stroke="#e8b84b" stroke-width="0.3" opacity="0.2"/>
+            <circle cx="55" cy="55" r="12" fill="#e8b84b" opacity="0.15"/>
+            <circle cx="55" cy="55" r="7" fill="#e8b84b"/>
+            <line x1="55" y1="5" x2="55" y2="18" stroke="#e8b84b" stroke-width="1.5"/>
+            <line x1="55" y1="92" x2="55" y2="105" stroke="#e8b84b" stroke-width="1.5"/>
+            <line x1="8" y1="30" x2="21" y2="37" stroke="#e8b84b" stroke-width="1" opacity="0.5"/>
+            <line x1="102" y1="30" x2="89" y2="37" stroke="#e8b84b" stroke-width="1" opacity="0.5"/>
+        </svg>
+    </div>
+
+    <!-- SYSTEM LABEL -->
+    <div class="sys-label">Transport Management System</div>
+
+    <!-- HEADLINE -->
+    <h1 class="splash-headline">TRANSNET<em>X</em></h1>
+
+    <!-- TAGLINE -->
+    <p class="splash-tagline">
+        Next-generation fleet dispatch &amp; management platform.<br>
+        Seamless operations for drivers, passengers &amp; administrators.
+    </p>
+
+    <!-- STATS STRIP -->
+    <div class="stats-strip">
+        <div class="stat-block">
+            <div class="stat-num">1<span>K+</span></div>
+            <div class="stat-label">Vehicles</div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-num">24<span>/7</span></div>
+            <div class="stat-label">Dispatch</div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-num">98<span>%</span></div>
+            <div class="stat-label">Uptime</div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-num">5<span>0+</span></div>
+            <div class="stat-label">Routes</div>
+        </div>
+    </div>
+
+    <!-- ENTER BUTTON -->
+    <div class="btn-enter-wrap">
+        <a href="index.php" class="btn-enter" id="btn-enter">
+            <div class="btn-pulse-ring"></div>
+            <i class="fas fa-arrow-right"></i>
+            ENTER SYSTEM
+        </a>
+        <div class="btn-enter-note">Click to access the platform</div>
+    </div>
+
+</div>
+
+<script>
+    // ── LOADING SCREEN ──────────────────────────────────────
+    const loadingScreen = document.getElementById('loading-screen');
+    setTimeout(() => {
+        loadingScreen.classList.add('hidden');
+    }, 2200);
+
+    // ── ROAD CANVAS ANIMATION ────────────────────────────────
+    const canvas = document.getElementById('road-canvas');
+    const ctx = canvas.getContext('2d');
+    let W, H, lines = [];
+
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        initLines();
+    }
+
+    function initLines() {
+        lines = [];
+        const count = 60;
+        for (let i = 0; i < count; i++) {
+            lines.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                speed: 0.4 + Math.random() * 1.2,
+                len: 20 + Math.random() * 60,
+                opacity: 0.04 + Math.random() * 0.1,
+                width: 0.5 + Math.random() * 1,
+            });
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Dark gradient background
+        const bg = ctx.createLinearGradient(0, 0, 0, H);
+        bg.addColorStop(0, '#040507');
+        bg.addColorStop(0.5, '#080c14');
+        bg.addColorStop(1, '#040507');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+
+        // Vertical road lines (like highway markers)
+        lines.forEach(l => {
+            ctx.save();
+            ctx.globalAlpha = l.opacity;
+            ctx.strokeStyle = '#e8b84b';
+            ctx.lineWidth = l.width;
+            ctx.beginPath();
+            ctx.moveTo(l.x, l.y);
+            ctx.lineTo(l.x, l.y + l.len);
+            ctx.stroke();
+            ctx.restore();
+
+            l.y += l.speed;
+            if (l.y > H + l.len) l.y = -l.len;
+        });
+
+        // Subtle center road strip
+        const roadW = Math.min(W * 0.4, 500);
+        const roadX = (W - roadW) / 2;
+        const roadGrad = ctx.createLinearGradient(roadX, 0, roadX + roadW, 0);
+        roadGrad.addColorStop(0, 'transparent');
+        roadGrad.addColorStop(0.3, 'rgba(232,184,75,0.015)');
+        roadGrad.addColorStop(0.5, 'rgba(232,184,75,0.03)');
+        roadGrad.addColorStop(0.7, 'rgba(232,184,75,0.015)');
+        roadGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = roadGrad;
+        ctx.fillRect(roadX, 0, roadW, H);
+
+        requestAnimationFrame(draw);
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    draw();
+
+    // ── TICKER SETUP ────────────────────────────────────────
+    const tickerItems = [
+        'Fleet Management Active',
+        'All Vehicles Online',
+        'Dispatch System Ready',
+        'Route Optimization Active',
+        'Driver Portal Available',
+        'Passenger Portal Available',
+        'Admin Dashboard Ready',
+        '24/7 Support Operational',
+        'Real-time Tracking Enabled',
+    ];
+
+    const track = document.getElementById('ticker-track');
+    const doubled = [...tickerItems, ...tickerItems];
+    doubled.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'ticker-item';
+        el.innerHTML = `<span>${item}</span><span class="ticker-dot"></span>`;
+        track.appendChild(el);
+    });
+
+    // ── ENTER BUTTON — TRANSITION ────────────────────────────
+    const btnEnter = document.getElementById('btn-enter');
+    const overlay  = document.getElementById('transition-overlay');
+
+    btnEnter.addEventListener('click', function(e) {
+        e.preventDefault();
+        const dest = this.href;
+        overlay.classList.add('active');
+        setTimeout(() => {
+            window.location.href = dest;
+        }, 680);
+    });
+</script>
+</body>
+</html>

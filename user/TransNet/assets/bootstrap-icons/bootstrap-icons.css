@@ -1,0 +1,70 @@
+/* Local Bootstrap Icons placeholder CSS
+   Place actual Bootstrap Icons files here for offline use.
+   Recommended: download https://github.com/twbs/icons and copy
+   the compiled CSS + fonts into this folder, or add the single
+   `bootstrap-icons.svg` sprite and adjust rules accordingly.
+
+   Minimal fallback styles below to keep layout stable if icons are missing.
+*/
+
+.bi {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    font-style: normal;
+}
+
+/* You can add mappings like:
+   .bi.bi-airplane { background-image: url('airplane.svg'); }
+   or include the full bootstrap-icons.css + fonts.
+*/
+
+/* Local icon mappings for commonly used icons in TransNet pages */
+.bi.bi-airplane { background-image: url('airplane.svg'); }
+.bi.bi-send { background-image: url('send.svg'); }
+.bi.bi-x-circle { background-image: url('x-circle.svg'); }
+.bi.bi-x { background-image: url('x.svg'); }
+.bi.bi-slash-circle { background-image: url('slash-circle.svg'); }
+.bi.bi-exclamation-circle { background-image: url('exclamation-circle.svg'); }
+.bi.bi-house { background-image: url('house.svg'); }
+.bi.bi-car-front { background-image: url('car-front.svg'); }
+.bi.bi-bus-front { background-image: url('bus-front.svg'); }
+.bi.bi-key { background-image: url('key.svg'); }
+.bi.bi-info-circle { background-image: url('info-circle.svg'); }
+.bi.bi-graph-up { background-image: url('graph-up.svg'); }
+.bi.bi-card-list { background-image: url('card-list.svg'); }
+.bi.bi-gear { background-image: url('gear.svg'); }
+.bi.bi-box-arrow-right { background-image: url('box-arrow-right.svg'); }
+.bi.bi-bell { background-image: url('bell.svg'); }
+.bi.bi-suitcase { background-image: url('suitcase.svg'); }
+.bi.bi-geo-alt { background-image: url('geo-alt.svg'); }
+.bi.bi-arrow-left-right { background-image: url('arrow-left-right.svg'); }
+.bi.bi-flag { background-image: url('flag.svg'); }
+.bi.bi-calendar { background-image: url('calendar.svg'); }
+.bi.bi-arrow-right { background-image: url('arrow-right.svg'); }
+.bi.bi-clock { background-image: url('clock.svg'); }
+.bi.bi-tag { background-image: url('tag.svg'); }
+.bi.bi-hourglass-split { background-image: url('hourglass-split.svg'); }
+.bi.bi-building { background-image: url('building.svg'); }
+.bi.bi-chair { background-image: url('chair.svg'); }
+.bi.bi-ticket-perforated { background-image: url('ticket-perforated.svg'); }
+.bi.bi-pencil { background-image: url('pencil.svg'); }
+.bi.bi-person { background-image: url('person.svg'); }
+.bi.bi-person-badge { background-image: url('person-badge.svg'); }
+.bi.bi-clock-history { background-image: url('clock-history.svg'); }
+.bi.bi-file-text { background-image: url('file-text.svg'); }
+.bi.bi-check-circle { background-image: url('check-circle.svg'); }
+.bi.bi-check { background-image: url('check.svg'); }
+.bi.bi-telephone { background-image: url('telephone.svg'); }
+.bi.bi-envelope { background-image: url('envelope.svg'); }
+.bi.bi-crown { background-image: url('crown.svg'); }
+.bi.bi-couch { background-image: url('couch.svg'); }
+.bi.bi-gem { background-image: url('gem.svg'); }
+.bi.bi-search { background-image: url('search.svg'); }
+
+/* Ensure background images scale */
+.bi { background-size: 100% 100%; }
